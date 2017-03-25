@@ -1,0 +1,4 @@
+[submodule "src/Firmware/libraries/ArduinoNunchuk"]
+	path = src/Firmware/libraries/ArduinoNunchuk
+	url = https://github.com/bastianraschke/ArduinoNunchuk.git
+	branch = master
