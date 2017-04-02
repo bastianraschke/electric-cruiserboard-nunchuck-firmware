@@ -8,12 +8,13 @@
  *
  */
 
-#define FIRMWARE_VERSION                        "1.0.2"
+#define FIRMWARE_VERSION                        "1.0.3"
 
 #define DEBUG                                   0
 
 #define WIFI_SSID                               "Bastis Cruiserboard"
 #define WIFI_PASSWORD                           "cruiser1337"
+#define WIFI_CONNECTION_RETRIES                 20
 
 #define PIN_STATUSLED                           LED_BUILTIN
 
@@ -41,7 +42,9 @@
  *
  */
 
+
 ArduinoNunchuk nunchuk = ArduinoNunchuk();
+int connectionFailCouter = WIFI_CONNECTION_RETRIES;
 WiFiUDP udpClient = WiFiUDP();
 
 void setup()
@@ -77,22 +80,44 @@ void setupWifi()
 
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
+    bool wasSuccessful = true;
+
     while (WiFi.status() != WL_CONNECTED)
     {
+        if (connectionFailCouter <= 0)
+        {
+            wasSuccessful = false;
+            break;
+        }
+
+        Serial.print(F("."));
+
         // Blink 2 times when connecting
         blinkStatusLED(2);
+        delay(300);
 
-        delay(250);
-        Serial.print(F("."));
+        connectionFailCouter--;
     }
 
     Serial.println();
 
-    Serial.print(F("Connected to Wi-Fi access point. Obtained IP address: "));
-    Serial.println(WiFi.localIP());
+    if (wasSuccessful)
+    {
+        Serial.print(F("Connected to Wi-Fi access point. Obtained IP address: "));
+        Serial.println(WiFi.localIP());
 
-    // Enable LED constantly
-    digitalWrite(PIN_STATUSLED, LOW);
+        // Enable LED constantly
+        digitalWrite(PIN_STATUSLED, LOW);
+    }
+    else
+    {
+        Serial.printf("Connection failed after %i tries! Giving up.\n", WIFI_CONNECTION_RETRIES);
+
+        // Disable LED constantly
+        digitalWrite(PIN_STATUSLED, HIGH);
+
+        startDeepSleep();
+    }
 }
 
 void blinkStatusLED(const int times)
@@ -107,6 +132,14 @@ void blinkStatusLED(const int times)
         digitalWrite(PIN_STATUSLED, HIGH);
         delay(100);
     }
+}
+
+void startDeepSleep()
+{
+    Serial.println(F("Shutting down. Going to deep sleep..."));
+    ESP.deepSleep(0);
+
+    Serial.println(F("Deep sleep failed!"));
 }
 
 void loop()
@@ -190,56 +223,21 @@ void sendCurrentControlStatus()
     message[2] = buttonsPressedState;
     message[3] = multipliedBatteryVoltage;
 
-    // TODO: sizeof ok?
     sendUDPPacket(message, sizeof(message));
 }
 
 uint8_t normalizeValueX(const uint8_t rawValueX)
 {
-    uint8_t normalizedValue = 0;
-
-    /**
-     * Be sure the X value is not greater or smaller than the given limits.
-     *
-     */
-
-    if (rawValueX < NUNCHUK_MIN_VALUE_X)
-    {
-        normalizedValue = NUNCHUK_MIN_VALUE_X;
-    }
-    else if (rawValueX > NUNCHUK_MAX_VALUE_X)
-    {
-        normalizedValue = NUNCHUK_MAX_VALUE_X;
-    }
-    else
-    {
-        normalizedValue = rawValueX;
-    }
+    // Be sure the X value is not greater or smaller than the given limits:
+    const uint8_t normalizedValue = constrain(rawValueX, NUNCHUK_MIN_VALUE_X, NUNCHUK_MAX_VALUE_X);
 
     return normalizedValue;
 }
 
 uint8_t normalizeValueY(const uint8_t rawValueY)
 {
-    uint8_t normalizedValue = 0;
-
-    /**
-     * Be sure the Y value is not greater or smaller than the given limits.
-     *
-     */
-
-    if (rawValueY < NUNCHUK_MIN_VALUE_Y)
-    {
-        normalizedValue = NUNCHUK_MIN_VALUE_Y;
-    }
-    else if (rawValueY > NUNCHUK_MAX_VALUE_Y)
-    {
-        normalizedValue = NUNCHUK_MAX_VALUE_Y;
-    }
-    else
-    {
-        normalizedValue = rawValueY;
-    }
+    // Be sure the Y value is not greater or smaller than the given limits:
+    const uint8_t normalizedValue = constrain(rawValueY, NUNCHUK_MIN_VALUE_Y, NUNCHUK_MAX_VALUE_Y);
 
     return normalizedValue;
 }
