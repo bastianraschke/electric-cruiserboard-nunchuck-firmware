@@ -1,4 +1,4 @@
-# Firmware for electric cruiserboard Nunchuck
+# Firmware for electric cruiserboard Nunchuck remote
 
 ## Questions
 
